@@ -2,28 +2,6 @@ using System;
 using System.Collections.Generic;
 // using System.Linq.Enumerable;
 
-public class OutOfBoardAreaPositionException : Exception {
-  public
-   OutOfBoardAreaPositionException() {}
-
-  public
-   OutOfBoardAreaPositionException(string message) : base(message) {}
-
-  public
-   OutOfBoardAreaPositionException(string message, Exception inner) :
-       base(message, inner) {}
-}
-public class PieceDoesNotExistException : Exception {
-  public
-   PieceDoesNotExistException() {}
-
-  public
-   PieceDoesNotExistException(string message) : base(message) {}
-
-  public
-   PieceDoesNotExistException(string message, Exception inner) :
-       base(message, inner) {}
-}
 public class Pos {
   public Pos(int x_, int y_) {
     x = x_;
@@ -112,55 +90,83 @@ public class CoordinateTrans {
   public static Direction AtoDir(char dir) {
     return a2dir[dir];
   }
+}
 
+interface IMoveSkill {
+  List<Pos> GetDsts(Pos from);
+}
 
+public class PosMoveSkill : IMoveSkill {
+  public PosMoveSkill() {
+  }
+
+  public void Add(Pos rel_pos) {
+    _rel_pos.Add(rel_pos);
+  }
+
+  public List<Pos> GetDsts(Pos from) {
+    var poses = new List<Pos>();
+    foreach(var rel in _rel_pos) {
+      var pos = from + rel;
+      poses.Add(pos);
+    }
+    return poses;
+  }
+
+  private List<Pos> _rel_pos = new List<Pos>();
 }
 
 public class Piece {
   public enum Type {
     Good,
-    Bad
+    Bad,
   }
 
-  public Piece(Type type) {
+  public enum MoveType {
+    Dir,
+    Pos,
+    Dist,
+  }
+
+  public Piece(Type type, Direction dir) {
     _type = type;
-  }
-
-  public void Move(Direction dir) {
-    switch (dir) {
-      case Direction.Front:
-        _pos.x++;
-        break;
-      case Direction.Back:
-        _pos.x--;
-        break;
-      case Direction.Left:
-        _pos.y--;
-        break;
-      case Direction.Right:
-        _pos.y++;
-        break;
-    }
-  }
-
-  public Pos GetPos() {
-    return _pos;
-  }
-
-  public int X() {
-    return _pos.x;
-  }
-
-  public int Y() {
-    return _pos.y;
+    _dir  = dir;
   }
 
   public Type GetPieceType() {
     return _type;
   }
 
-  private Pos _pos = new Pos(0, 0);
+  // FIXME : use move skill
+  public Pos CalcDiff(Direction dir) {
+    if (_dir == Direction.Front) {
+      switch (dir) {
+        case Direction.Front:
+          return new Pos(+1, 0);
+        case Direction.Back:
+          return new Pos(-1, 0);
+        case Direction.Left:
+          return new Pos(0, +1);
+        case Direction.Right:
+          return new Pos(0, -1);
+      }
+    } else if (_dir == Direction.Back) {
+      switch (dir) {
+        case Direction.Front:
+          return new Pos(-1, 0);
+        case Direction.Back:
+          return new Pos(+1, 0);
+        case Direction.Left:
+          return new Pos(0, -1);
+        case Direction.Right:
+          return new Pos(0, +1);
+      }
+    }
+    throw new System.Exception();
+  }
+
   private Type _type;
+  private Direction _dir;
 }
 
 public class Board {
@@ -228,33 +234,36 @@ public class Board {
   bool WithIn(Pos pos) { return pos.WithIn(MinPos, MaxPos); }
 
  public
-  Pos CalcDiff(PlayerType ptype, Direction dir) {
-    switch (ptype) {
-      case PlayerType.Player1:
-        switch (dir) {
-          case Direction.Front:
-            return new Pos(-1, 0);
-          case Direction.Back:
-            return new Pos(+1, 0);
-          case Direction.Left:
-            return new Pos(0, -1);
-          case Direction.Right:
-            return new Pos(0, +1);
-        }
-        break;
-      case PlayerType.Player2:
-        switch (dir) {
-          case Direction.Front:
-            return new Pos(+1, 0);
-          case Direction.Back:
-            return new Pos(-1, 0);
-          case Direction.Left:
-            return new Pos(0, +1);
-          case Direction.Right:
-            return new Pos(0, -1);
-        }
-        break;
-    }
+  Pos CalcDiff(int player_id, Pos from, Direction dir) {
+    var piece = players[player_id].map[from.x, from.y];
+    return piece.CalcDiff(dir);
+    // TODO:
+    // switch (ptype) {
+    //   case PlayerType.Player1:
+    //     switch (dir) {
+    //       case Direction.Front:
+    //         return new Pos(-1, 0);
+    //       case Direction.Back:
+    //         return new Pos(+1, 0);
+    //       case Direction.Left:
+    //         return new Pos(0, -1);
+    //       case Direction.Right:
+    //         return new Pos(0, +1);
+    //     }
+    //     break;
+    //   case PlayerType.Player2:
+    //     switch (dir) {
+    //       case Direction.Front:
+    //         return new Pos(+1, 0);
+    //       case Direction.Back:
+    //         return new Pos(-1, 0);
+    //       case Direction.Left:
+    //         return new Pos(0, +1);
+    //       case Direction.Right:
+    //         return new Pos(0, -1);
+    //     }
+    //     break;
+    // }
     throw new System.Exception();
   }
 
@@ -318,8 +327,8 @@ public class Board {
     return players[pidx].gs;
   }
 
-  private Piece GetPiece(int pidx, Pos pos) {
-    return players[pidx].map[pos.x, pos.y];
+  private Piece GetPiece(int player_id, Pos pos) {
+    return players[player_id].map[pos.x, pos.y];
   }
 
   private void MarkAsTaken(int pidx, Pos pos) {
@@ -330,17 +339,14 @@ public class Board {
     // player.map[pos.x, pos.y] = null;
   }
 
-  private void Move(int pidx, Pos from, Pos to) {
-    var player = players[pidx];
+  private void Move(int player_id, Pos from, Pos to) {
+    var player = players[player_id];
     player.map[to.x, to.y] = player.map[from.x, from.y];
     player.map[from.x, from.y] = null;
   }
 
-  private void TryMovePlayerPiece(PlayerType ptype, Pos from, Pos to) {
-    var idx = GetPlayerIndex(ptype);
-
-    // var gs = GetPiece(_pmap, from);
-    var gs = GetPiece(idx, from);
+  private void TryMovePlayerPiece(int player_id, Pos from, Pos to) {
+    var gs = GetPiece(player_id, from);
     if (gs == null) {
       var cx = CoordinateTrans.XtoA(from.x);
       var cy = CoordinateTrans.YtoA(from.y);
@@ -348,28 +354,28 @@ public class Board {
           $"Threre is NOT a PIECE in ({cx},{cy}) or ({from.x},{from.y}).");
     }
 
-    // var friend = GetPiece(_pmap, to);
-    var friend = GetPiece(idx, to);
+    var friend = GetPiece(player_id, to);
     if (friend != null) {
-      var cx = CoordinateTrans.XtoA(from.x);
-      var cy = CoordinateTrans.YtoA(from.y);
+      var cx = CoordinateTrans.XtoA(to.x);
+      var cy = CoordinateTrans.YtoA(to.y);
       throw new PieceDoesNotExistException(
-          $"Threre is a FRIEND PIECE in ({cx},{cy}) or ({from.x},{from.y}).");
+          $"Threre is a FRIEND PIECE in ({cx},{cy}) or ({to.x},{to.y}).");
     }
 
+    // FIXME: use foreach for players
     // requires System.Linq.Enumerable;
     // var e_indices =
-    //     from i in Enumerable.Range(0, players.Length) where i != idx select i;
+    //     from i in Enumerable.Range(0, players.Length) where i != player_id select i;
     // foreach (int i in e_indices) {
     for (int i = 0; i < players.Length; i++) {
-      if (i == idx) continue;
+      if (i == player_id) continue;
       var enemy  = GetPiece(i, to);
       if (enemy != null) {
         MarkAsTaken(i, to);
         break;
       }
     }
-    Move(idx, from, to);
+    Move(player_id, from, to);
     // var enemy  = GetPiece(1, to);
     // if (enemy != null) {
     //   MarkAsTaken(1, to);
@@ -379,10 +385,11 @@ public class Board {
     return;
   }
 
-  public void TryMovePiece(PlayerType ptype, Pos from, Direction dir) {
-    var to = from + CalcDiff(ptype, dir);
-    Console.WriteLine($"------> {from.x} {from.y}");
-    Console.WriteLine($"------> {CalcDiff(ptype, dir).x} {CalcDiff(ptype, dir).y}");
+  public void TryMovePiece(int player_id, Pos from, Direction dir) {
+    var to = from + CalcDiff(player_id, from, dir);
+    Console.WriteLine($"------> from : {from.x} {from.y}");
+    Console.WriteLine($"        to   : {to.x} {to.y}");
+    Console.WriteLine($"             : {CalcDiff(player_id, from, dir).x} {CalcDiff(player_id, from, dir).y}");
     if (WithIn(to) == false) {
       var cx = CoordinateTrans.XtoA(to.x);
       var cy = CoordinateTrans.YtoA(to.y);
@@ -390,7 +397,7 @@ public class Board {
           $"({cx},{cy}) or ({to.x},{to.y}) is out of board area ({BoardHeight},{BoardWidth}).");
     }
 
-    TryMovePlayerPiece(ptype, from, to);
+    TryMovePlayerPiece(player_id, from, to);
   }
 
   public void EvalOperation() {
@@ -497,255 +504,5 @@ public class Board {
       Console.WriteLine(str);
       Console.WriteLine("   +---+---+---+---+---+---+");
     }
-  }
-}
-
-delegate int PlayerTurnOperation(ref Board board);
-
-public class GameManager {
-  public GameManager() {
-    NumOfPlayers = 2;
-    PhaseOrder = new List<int> {0, 1};
-    ope = new PlayerTurnOperation[NumOfPlayers];
-    ope[0] = delegate (ref Board board) {
-      Console.WriteLine("--- Player1's Phase ---");
-      var args = Console.ReadLine().Split(' ');
-      Console.WriteLine($" --> {args}");
-      // _board.TryMovePiece((PlayerType), from, dir);
-      return 0;
-    };
-    ope[1] = delegate (ref Board board) {
-      Console.WriteLine("--- Player2's Phase ---");
-      var args = Console.ReadLine().Split(' ');
-      Console.WriteLine($" --> {args}");
-      // _board.TryMovePiece((PlayerType), from, dir);
-      return 0;
-    };
-  }
-
-  public bool IsAllBadPieceTaken(int pidx) {
-    var player = _board.GetPlayers()[pidx];
-    if (player.bads.Count == 0) {
-      return true;
-    }
-    return false;
-  }
-
-  public bool IsAllGoodPieceTaken(int pidx) {
-    var player = _board.GetPlayers()[pidx];
-    if (player.goods.Count == 0) {
-      return true;
-    }
-    return false;
-  }
-
-  public void UpdateLosers() {
-    foreach (int pidx in PhaseOrder) {
-      if(IsAllGoodPieceTaken(pidx) == true) {
-        PhaseOrder.Remove(pidx);
-        losers.AddLast(pidx);
-      }
-    }
-  }
-
-  public bool CheckWinner() {
-    foreach (int pidx in PhaseOrder) {
-      if(IsAllBadPieceTaken(pidx) == true) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  public bool CheckEscapablePiece() {
-    foreach (int pidx in PhaseOrder) {
-      if(IsAllBadPieceTaken(pidx) == true) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  public bool CheckGameOver() {
-    /* Case1. All Good Pieces are Taken. */
-    if (PhaseOrder.Count == 1) {
-      return true;
-    }
-    /* Case2. All Bad Pieces are Taken. */
-    if (CheckWinner() == true) {
-      return true;
-    }
-    /* Case3. One of Piece move out of playing area. */
-    return CheckEscapablePiece();
-  }
-
-  public void AssignBoard(ref Board board) {
-    _board = board;
-  }
-
-  public void ResetGame(PlayerType first_move) {
-    _first_move = first_move;
-    OperationCount = 0;
-  }
-
-  private PlayerType CurrentPhase() {
-    switch (_first_move) {
-      case PlayerType.Player1:
-        return OperationCount % 2 == 0 ? PlayerType.Player1 : PlayerType.Player2;
-      case PlayerType.Player2:
-        return OperationCount % 2 == 0 ? PlayerType.Player2 : PlayerType.Player1;
-    }
-    // FIXME:
-    return PlayerType.Player1;
-  }
-
-  public void StartGame() {
-    while(true) {
-      foreach (var pidx in PhaseOrder) {
-        Console.WriteLine($" Phase : {pidx}");
-        var op = ope[pidx];
-        op(ref _board);
-        _board.DispCurrentMap();
-        OperationCount++;
-      }
-      TurnCount++;
-    }
-  }
-
-  private Board _board;
-  private int OperationCount = 0;
-  private int TurnCount = 0;
-  private int NumOfPlayers = 0;
-  private List<int> PhaseOrder = new List<int>();
-  private PlayerType _first_move = PlayerType.Player1;
-
-  private PlayerTurnOperation[] ope;
-  private LinkedList<int> losers = new LinkedList<int>();
-}
-
-delegate int ConsoleCommand(string[] args, Board brd);
-
-public class Sample {
-  public static string[] GetUserInput() {
-    string[] args;
-    try {
-      args = Console.ReadLine().Split(' ');
-    } catch (System.NullReferenceException e) {
-      Console.Write("\n");
-      args = new string[] {""};
-    }
-    return args;
-  }
-
-  public static void Main() {
-    Console.WriteLine("--- Piece Test");
-    Piece gst = new Piece(Piece.Type.Good);
-    Console.WriteLine("--- Pos : x:{0} y:{1}", gst.X(), gst.Y());
-    Console.WriteLine("--- Move Front");
-    gst.Move(Direction.Front);
-    Console.WriteLine("--- Pos : x:{0} y:{1}", gst.X(), gst.Y());
-    Console.WriteLine("--- Move Right");
-    gst.Move(Direction.Right);
-    Console.WriteLine("--- Pos : x:{0} y:{1}", gst.X(), gst.Y());
-
-    Board brd = new Board();
-    for (int i = 0; i < 4; i++) {
-      Piece gst1 = new Piece(Piece.Type.Good);
-      brd.LocatePiece(PlayerType.Player1, 4, i+1, gst1);
-      Piece gst2 = new Piece(Piece.Type.Bad);
-      brd.LocatePiece(PlayerType.Player1, 5, i+1, gst2);
-    }
-    for (int i = 0; i < 4; i++) {
-      Piece gst1 = new Piece(Piece.Type.Good);
-      brd.LocatePiece(PlayerType.Player2, 0, i+1, gst1);
-      Piece gst2 = new Piece(Piece.Type.Bad);
-      brd.LocatePiece(PlayerType.Player2, 1, i+1, gst2);
-    }
-    brd.test();
-    brd.DispCurrentMap();
-
-    var commands = new Dictionary<string, ConsoleCommand>();
-    commands.Add("args",  delegate (string[] args, Board board) {
-      Console.WriteLine(" Command : {0}", args[0]);
-      for (int i = 0; i < args.Length; i++) {
-        Console.WriteLine(" {0} : {1}", i, args[i]);
-      }
-      return 0;
-    });
-    commands.Add("info", delegate(string[] args, Board board) {
-      board.DispPieceInfo();
-      return 0;
-    });
-    commands.Add("start",  delegate (string[] args, Board board) {
-      var mgr = new GameManager();
-      mgr.AssignBoard(ref board);
-      mgr.StartGame();
-
-      return 0;
-    });
-    commands.Add("movep",  delegate (string[] args, Board board) {
-      if (args.Length < 4) {
-        Console.WriteLine(" {0} fromA-F from1-6 <Front,Back,Left,Right> ", args[0]);
-        return 22;
-      }
-
-      var x = CoordinateTrans.AtoX(args[1][0]);
-      var y = CoordinateTrans.AtoY(args[2][0]);
-      var from = new Pos(x, y);
-      var dir = CoordinateTrans.AtoDir(args[3][0]);
-
-      board.TryMovePiece(PlayerType.Player1, from, dir);
-
-      return 0;
-    });
-    commands.Add("movee",  delegate (string[] args, Board board) {
-      if (args.Length < 4) {
-        Console.WriteLine(" {0} fromA-F from1-6 <Front,Back,Left,Right> ", args[0]);
-        return 22;
-      }
-
-      var x = CoordinateTrans.AtoX(args[1][0]);
-      var y = CoordinateTrans.AtoY(args[2][0]);
-      var from = new Pos(x, y);
-      var dir = CoordinateTrans.AtoDir(args[3][0]);
-
-      board.TryMovePiece(PlayerType.Player2, from, dir);
-
-      return 0;
-    });
-
-    do {
-      Console.Write("$ ");
-      var args = GetUserInput();
-      Console.WriteLine(" --> <{0}> ", args[0]);
-
-      if (args[0] == "exit") {
-        Console.WriteLine("good bye!");
-        break;
-      }
-      if (args[0] == "help") {
-          Console.WriteLine(" command name : discription");
-        foreach (var name in commands.Keys) {
-          Console.WriteLine(" {0} : {1}", name, "n/a");
-        }
-        continue;
-      }
-
-      try {
-        var cmd = commands[args[0]];
-        try {
-          var eno = cmd(args, brd);
-          Console.WriteLine(" Command {0} --> {1}", args, eno);
-        } catch (System.Exception e) {
-          Console.WriteLine(" Command {0} throw exception", args);
-          Console.WriteLine(e);
-        }
-      } catch (System.Collections.Generic.KeyNotFoundException) {
-        Console.WriteLine(" unknown command : {0}", args[0]);
-      }
-
-      brd.DispCurrentMap();
-    }
-    while(true);
   }
 }
