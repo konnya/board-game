@@ -27,17 +27,29 @@ public class Sample {
     // gst.Move(Direction.Right);
     // Console.WriteLine("--- Pos : x:{0} y:{1}", gst.X(), gst.Y());
 
+    var gs_move_skill = new PosMoveSkill();
+    gs_move_skill.Add(new Pos( 1,  0)); // front
+    gs_move_skill.Add(new Pos(-1,  0)); // back
+    gs_move_skill.Add(new Pos( 0,  1)); // right
+    gs_move_skill.Add(new Pos( 0, -1)); // left
+
     Board brd = new Board();
     for (int i = 0; i < 4; i++) {
       Piece gst1 = new Piece(Piece.Type.Good, Direction.Back);
+      gst1.AddMoveSkill(gs_move_skill);
       brd.LocatePiece(PlayerType.Player1, 4, i+1, gst1);
+
       Piece gst2 = new Piece(Piece.Type.Bad, Direction.Back);
+      gst2.AddMoveSkill(gs_move_skill);
       brd.LocatePiece(PlayerType.Player1, 5, i+1, gst2);
     }
     for (int i = 0; i < 4; i++) {
       Piece gst1 = new Piece(Piece.Type.Good, Direction.Front);
+      gst1.AddMoveSkill(gs_move_skill);
       brd.LocatePiece(PlayerType.Player2, 0, i+1, gst1);
+
       Piece gst2 = new Piece(Piece.Type.Bad, Direction.Front);
+      gst2.AddMoveSkill(gs_move_skill);
       brd.LocatePiece(PlayerType.Player2, 1, i+1, gst2);
     }
     brd.test();
@@ -64,35 +76,61 @@ public class Sample {
     });
     commands.Add("movep",  delegate (string[] args, Board board) {
       if (args.Length < 4) {
-        Console.WriteLine(" {0} fromA-F from1-6 <Front,Back,Left,Right> ", args[0]);
+        Console.WriteLine($" {args[0]} :");
+        Console.WriteLine($"  usage 1 :  ${args[0]} fromA-F from1-6 <Front,Back,Left,Right> ");
+        Console.WriteLine($"  usage 2 :  ${args[0]} fromA-F from1-6 toA-F to1-6 ");
         return 22;
       }
 
-      var x = CoordinateTrans.AtoX(args[1][0]);
-      var y = CoordinateTrans.AtoY(args[2][0]);
-      var from = new Pos(x, y);
-      var dir = CoordinateTrans.AtoDir(args[3][0]);
+      if (args.Length == 4) {
+        var x = CoordinateTrans.AtoX(args[1][0]);
+        var y = CoordinateTrans.AtoY(args[2][0]);
+        var from = new Pos(x, y);
+        var dir = CoordinateTrans.AtoDir(args[3][0]);
 
-      // FIXME: 1st argument must be player-id
-      // board.TryMovePiece(PlayerType.Player1, from, dir);
-      board.TryMovePiece((int)PlayerType.Player1, from, dir);
+        // FIXME: 1st argument must be player-id
+        // board.TryMovePiece(PlayerType.Player1, from, dir);
+        board.TryMovePiece((int)PlayerType.Player1, from, dir);
+      } else {
+        var from_x = CoordinateTrans.AtoX(args[1][0]);
+        var from_y = CoordinateTrans.AtoY(args[2][0]);
+        var from = new Pos(from_x, from_y);
+        var to_x = CoordinateTrans.AtoX(args[3][0]);
+        var to_y = CoordinateTrans.AtoY(args[4][0]);
+        var to = new Pos(to_x, to_y);
+
+        board.TryMovePiece((int)PlayerType.Player1, from, to);
+      }
 
       return 0;
     });
     commands.Add("movee",  delegate (string[] args, Board board) {
       if (args.Length < 4) {
-        Console.WriteLine(" {0} fromA-F from1-6 <Front,Back,Left,Right> ", args[0]);
+        Console.WriteLine($" {args[0]} :");
+        Console.WriteLine($"  usage 1 :  ${args[0]} fromA-F from1-6 <Front,Back,Left,Right> ");
+        Console.WriteLine($"  usage 2 :  ${args[0]} fromA-F from1-6 toA-F to1-6 ");
         return 22;
       }
 
-      var x = CoordinateTrans.AtoX(args[1][0]);
-      var y = CoordinateTrans.AtoY(args[2][0]);
-      var from = new Pos(x, y);
-      var dir = CoordinateTrans.AtoDir(args[3][0]);
+      if (args.Length == 4) {
+        var x = CoordinateTrans.AtoX(args[1][0]);
+        var y = CoordinateTrans.AtoY(args[2][0]);
+        var from = new Pos(x, y);
+        var dir = CoordinateTrans.AtoDir(args[3][0]);
 
-      // FIXME: 1st argument must be player-id
-      // board.TryMovePiece(PlayerType.Player2, from, dir);
-      board.TryMovePiece((int)PlayerType.Player2, from, dir);
+        // FIXME: 1st argument must be player-id
+        // board.TryMovePiece(PlayerType.Player2, from, dir);
+        board.TryMovePiece((int)PlayerType.Player2, from, dir);
+      } else {
+        var from_x = CoordinateTrans.AtoX(args[1][0]);
+        var from_y = CoordinateTrans.AtoY(args[2][0]);
+        var from = new Pos(from_x, from_y);
+        var to_x = CoordinateTrans.AtoX(args[3][0]);
+        var to_y = CoordinateTrans.AtoY(args[4][0]);
+        var to = new Pos(to_x, to_y);
+
+        board.TryMovePiece((int)PlayerType.Player2, from, to);
+      }
 
       return 0;
     });

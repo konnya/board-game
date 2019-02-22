@@ -2,35 +2,77 @@ using System;
 using System.Collections.Generic;
 // using System.Linq.Enumerable;
 
-public class Pos {
+public class Pos : IEquatable<Pos> {
   public Pos(int x_, int y_) {
-    x = x_;
-    y = y_;
+    _x = x_;
+    _y = y_;
   }
 
   public static Pos operator+ (Pos pos, Pos diff) {
-    return new Pos(pos.x + diff.x, pos.y + diff.y);
+    return new Pos(pos._x + diff._x, pos._y + diff._y);
   }
 
   public static Pos operator- (Pos pos, Pos diff) {
-    return new Pos(pos.x - diff.x, pos.y - diff.y);
+    return new Pos(pos._x - diff._x, pos._y - diff._y);
   }
 
+  public override int GetHashCode() {
+    return _x ^ _y;
+  }
+
+  public override bool Equals(object obj) {
+      if (!(obj is Pos))
+          return false;
+
+      return Equals((Pos)obj);
+  }
+
+  public bool Equals(Pos other) {
+      if (_x != other._x)
+          return false;
+
+      return _y == other._y;
+  }
+
+  public static bool operator ==(Pos pos1, Pos pos2)
+  {
+      return pos1.Equals(pos2);
+  }
+
+  public static bool operator !=(Pos pos1, Pos pos2)
+  {
+      return !pos1.Equals(pos2);
+  }
+
+ // public static bool operator== (Pos pos1, Pos pos2) {
+ //   if (pos1.x == pos2.x && pos1.y == pos2.y) {
+ //     return true;
+ //   }
+ //   return false;
+ // }
+
+ // public static bool operator!= (Pos pos1, Pos pos2) {
+ //   if (pos1 == pos2) {
+ //     return false;
+ //   }
+ //   return true;
+ // }
+
   public bool WithIn(Pos min, Pos max) {
-    if (x < min.x) { return false;}
-    if (y < min.y) { return false;}
-    if (x > max.x) { return false;}
-    if (y > max.y) { return false;}
+    if (_x < min._x) { return false;}
+    if (_y < min._y) { return false;}
+    if (_x > max._x) { return false;}
+    if (_y > max._y) { return false;}
     return true;
   }
 
   public void Set(int x_, int y_) {
-    x = x_;
-    y = y_;
+    _x = x_;
+    _y = y_;
   }
 
-  public int x;
-  public int y;
+  public int _x;
+  public int _y;
 }
 
 public enum PlayerType {
@@ -92,7 +134,7 @@ public class CoordinateTrans {
   }
 }
 
-interface IMoveSkill {
+public interface IMoveSkill {
   List<Pos> GetDsts(Pos from);
 }
 
@@ -123,9 +165,9 @@ public class Piece {
   }
 
   public enum MoveType {
-    Dir,
-    Pos,
-    Dist,
+    Dir,  // DirMoveSkill
+    Pos,  // PosMoveSkill
+    Dist, // DistMoveSkill
   }
 
   public Piece(Type type, Direction dir) {
@@ -165,8 +207,34 @@ public class Piece {
     throw new System.Exception();
   }
 
+  public void AddMoveSkill(IMoveSkill skill) {
+    _move_skills.Add(skill);
+  }
+
+  public bool CheckMovablePositions(Pos from, Pos to) {
+    var res = new List<Pos>();
+    foreach (var skill in _move_skills) {
+      foreach (var dst in skill.GetDsts(from)) {
+        Console.WriteLine($"x y = {dst._x} {dst._y}");
+        if (dst == to) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  public List<Pos> GetMovablePositions(Pos from) {
+    var res = new List<Pos>();
+    foreach (var skill in _move_skills) {
+      res.AddRange(skill.GetDsts(from));
+    }
+    return res;
+  }
+
   private Type _type;
   private Direction _dir;
+  private List<IMoveSkill> _move_skills = new List<IMoveSkill>();
 }
 
 public class Board {
@@ -184,11 +252,11 @@ public class Board {
     } else {
       bads.Add(piece);
     }
-    map[pos.x, pos.y] = piece;
+    map[pos._x, pos._y] = piece;
   }
 
   public void MarkAsTaken(Pos pos) {
-    var piece = map[pos.x, pos.y];
+    var piece = map[pos._x, pos._y];
       Console.WriteLine("taken : x xy");
     if (piece.GetPieceType() == Piece.Type.Good) {
       Console.WriteLine("taken : good");
@@ -199,7 +267,7 @@ public class Board {
       bads.Remove(piece);
       taken_bads.Add(piece);
     }
-    map[pos.x, pos.y] = null;
+    map[pos._x, pos._y] = null;
   }
 
   public List<Piece> gs = new List<Piece>();
@@ -235,7 +303,7 @@ public class Board {
 
  public
   Pos CalcDiff(int player_id, Pos from, Direction dir) {
-    var piece = players[player_id].map[from.x, from.y];
+    var piece = players[player_id].map[from._x, from._y];
     return piece.CalcDiff(dir);
     // TODO:
     // switch (ptype) {
@@ -328,38 +396,51 @@ public class Board {
   }
 
   private Piece GetPiece(int player_id, Pos pos) {
-    return players[player_id].map[pos.x, pos.y];
+    return players[player_id].map[pos._x, pos._y];
   }
 
   private void MarkAsTaken(int pidx, Pos pos) {
     Console.WriteLine("taken : good-");
     var player = players[pidx];
     player.MarkAsTaken(pos);
-    // player.taken.Add(player.map[pos.x, pos.y]);
-    // player.map[pos.x, pos.y] = null;
+    // player.taken.Add(player.map[pos._x, pos._y]);
+    // player.map[pos._x, pos._y] = null;
   }
 
   private void Move(int player_id, Pos from, Pos to) {
     var player = players[player_id];
-    player.map[to.x, to.y] = player.map[from.x, from.y];
-    player.map[from.x, from.y] = null;
+    player.map[to._x, to._y] = player.map[from._x, from._y];
+    player.map[from._x, from._y] = null;
   }
 
-  private void TryMovePlayerPiece(int player_id, Pos from, Pos to) {
+  private bool TryMovePlayerPiece(int player_id, Pos from, Pos to) {
     var gs = GetPiece(player_id, from);
+
+    if (gs.CheckMovablePositions(from, to) == false) {
+      var cfx = CoordinateTrans.XtoA(from._x);
+      var cfy = CoordinateTrans.YtoA(from._y);
+      var ctx = CoordinateTrans.XtoA(to._x);
+      var cty = CoordinateTrans.YtoA(to._y);
+      Console.WriteLine(
+          $"This PIECE can not move from {cfx} {cfy} to {ctx} {cty}");
+      Console.WriteLine(
+          $"                            ({from._x} {from._y} to {to._x} {to._y})");
+      return false;
+    }
+
     if (gs == null) {
-      var cx = CoordinateTrans.XtoA(from.x);
-      var cy = CoordinateTrans.YtoA(from.y);
+      var cx = CoordinateTrans.XtoA(from._x);
+      var cy = CoordinateTrans.YtoA(from._y);
       throw new PieceDoesNotExistException(
-          $"Threre is NOT a PIECE in ({cx},{cy}) or ({from.x},{from.y}).");
+          $"Threre is NOT a PIECE in ({cx},{cy}) or ({from._x},{from._y}).");
     }
 
     var friend = GetPiece(player_id, to);
     if (friend != null) {
-      var cx = CoordinateTrans.XtoA(to.x);
-      var cy = CoordinateTrans.YtoA(to.y);
+      var cx = CoordinateTrans.XtoA(to._x);
+      var cy = CoordinateTrans.YtoA(to._y);
       throw new PieceDoesNotExistException(
-          $"Threre is a FRIEND PIECE in ({cx},{cy}) or ({to.x},{to.y}).");
+          $"Threre is a FRIEND PIECE in ({cx},{cy}) or ({to._x},{to._y}).");
     }
 
     // FIXME: use foreach for players
@@ -382,19 +463,30 @@ public class Board {
     // }
     // Move(0, from ,to);
 
-    return;
+    return true;
   }
 
   public void TryMovePiece(int player_id, Pos from, Direction dir) {
     var to = from + CalcDiff(player_id, from, dir);
-    Console.WriteLine($"------> from : {from.x} {from.y}");
-    Console.WriteLine($"        to   : {to.x} {to.y}");
-    Console.WriteLine($"             : {CalcDiff(player_id, from, dir).x} {CalcDiff(player_id, from, dir).y}");
+    Console.WriteLine($"------> from : {from._x} {from._y}");
+    Console.WriteLine($"        to   : {to._x} {to._y}");
+    Console.WriteLine($"             : {CalcDiff(player_id, from, dir)._x} {CalcDiff(player_id, from, dir)._y}");
     if (WithIn(to) == false) {
-      var cx = CoordinateTrans.XtoA(to.x);
-      var cy = CoordinateTrans.YtoA(to.y);
+      var cx = CoordinateTrans.XtoA(to._x);
+      var cy = CoordinateTrans.YtoA(to._y);
       throw new OutOfBoardAreaPositionException(
-          $"({cx},{cy}) or ({to.x},{to.y}) is out of board area ({BoardHeight},{BoardWidth}).");
+          $"({cx},{cy}) or ({to._x},{to._y}) is out of board area ({BoardHeight},{BoardWidth}).");
+    }
+
+    TryMovePlayerPiece(player_id, from, to);
+  }
+
+  public void TryMovePiece(int player_id, Pos from, Pos to) {
+    if (WithIn(to) == false) {
+      var cx = CoordinateTrans.XtoA(to._x);
+      var cy = CoordinateTrans.YtoA(to._y);
+      throw new OutOfBoardAreaPositionException(
+          $"({cx},{cy}) or ({to._x},{to._y}) is out of board area ({BoardHeight},{BoardWidth}).");
     }
 
     TryMovePlayerPiece(player_id, from, to);

@@ -13,6 +13,7 @@ public class OutOfBoardAreaPositionException : Exception {
    OutOfBoardAreaPositionException(string message, Exception inner) :
        base(message, inner) {}
 }
+
 public class PieceDoesNotExistException : Exception {
   public
    PieceDoesNotExistException() {}
