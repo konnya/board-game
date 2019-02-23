@@ -232,6 +232,16 @@ public class Piece {
     return res;
   }
 
+  public bool[,] GetMovableMap(Pos from, int max_x, int max_y) {
+    var map = new bool[max_x, max_y];
+
+    foreach (var pos in GetMovablePositions(from)) {
+      map[pos._x, pos._y] = true;
+    }
+
+    return map;
+  }
+
   private Type _type;
   private Direction _dir;
   private List<IMoveSkill> _move_skills = new List<IMoveSkill>();
@@ -588,6 +598,36 @@ public class Board {
         } else {
           if ((x == 0 || x == 5) && (y == 0 || y == 5)) {
             str += "( )|";
+          } else {
+            str += "   |";
+          }
+        }
+      }
+      Console.WriteLine(str);
+      Console.WriteLine("   +---+---+---+---+---+---+");
+    }
+  }
+
+  public void DispMovablePos(int player_id, Pos cur) {
+    var piece = players[player_id].map[cur._x, cur._y];
+    if (piece == null) {
+      return;
+    }
+    var map = piece.GetMovableMap(cur, 6, 6);
+    Console.WriteLine("     1   2   3   4   5   6");
+    Console.WriteLine("   +---+---+---+---+---+---+");
+    for (int x = 0; x < 6; x++) {
+      String str = " " + CoordinateTrans.XtoA(x) + " |";
+      for (int y = 0; y < 6; y++) {
+        if (map[x, y] == true) {
+          str += " * |";
+        } else {
+          if(players[0].map[x, y] != null) {
+            var sym = GetPieceTypeSymbol(players[0].map[x, y]);
+            str += " " + sym + " |";
+          } else if(players[1].map[x, y] != null) {
+            var sym = GetPieceTypeSymbol(players[1].map[x, y]);
+            str += " " + sym + " |";
           } else {
             str += "   |";
           }

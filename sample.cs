@@ -67,6 +67,22 @@ public class Sample {
       board.DispPieceInfo();
       return 0;
     });
+    commands.Add("movable", delegate(string[] args, Board board) {
+      if (args.Length < 4) {
+        Console.WriteLine($" {args[0]} :");
+        Console.WriteLine($"  usage 1 :  ${args[0]} player-id fromA-F from1-6");
+        return 22;
+      }
+
+      var id = int.Parse(args[1]);
+      var x = CoordinateTrans.AtoX(args[2][0]);
+      var y = CoordinateTrans.AtoY(args[3][0]);
+      var from = new Pos(x, y);
+      Console.WriteLine($" ID:{id} x,y:{x},{y}");
+      board.DispMovablePos(id, from);
+
+      return 0;
+    });
     commands.Add("start",  delegate (string[] args, Board board) {
       var mgr = new GameManager();
       mgr.AssignBoard(ref board);
