@@ -2,7 +2,7 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
     <Target Name="Build">
         <Csc
-            Sources="board_game.cs;exception.cs;game_manager.cs;sample.cs"
+            Sources="Common.cs;Pos.cs;MoveSkill.cs;Piece.cs;Board.cs;Exception.cs;GameManager.cs;Sample.cs"
             OutputAssembly="brdgame.exe"
          />
     </Target>
